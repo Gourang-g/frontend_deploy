@@ -33,6 +33,7 @@ jobs:
 
       # 4. Connect to EC2 and deploy
       - name: Deploy to EC2
+        if: github.ref == 'refs/head/main'
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.EC2_HOST }}
