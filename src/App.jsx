@@ -20,7 +20,7 @@ function App() {
       {/* Hero Section */}
       <main className="hero">
         <div className="hero-content">
-          <div className="badge">✨ AI-Powered Software Engineeringgg</div>
+          <div className="badge">✨ AI-Powered Software Engineering</div>
 
           <h1>
             Your AI Assistant
