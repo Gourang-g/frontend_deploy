@@ -25,6 +25,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
 
       # 3. Cache npm dependencies using a custom key
       - name: Cache npm dependencies
@@ -57,7 +58,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-build
-          path: build/ # Change to 'build/' if using Create React App
+          path: dist/ # Change to 'build/' if using Create React App
           retention-days: 5
 
           
