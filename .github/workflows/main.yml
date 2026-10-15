@@ -38,7 +38,7 @@ jobs:
         if: steps.npm-cache.outputs.cache-hit != 'true'
         run: |
           echo "Cache MISS: Installing dependencies from scratch..."
-          cd frontend && npm ci
+          npm ci
 
       - name: Print Cache Status
         if: steps.npm-cache.outputs.cache-hit == 'true'
