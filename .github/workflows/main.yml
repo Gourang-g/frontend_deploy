@@ -42,7 +42,8 @@ jobs:
 
       - name: Print Cache Status
         if: steps.npm-cache.outputs.cache-hit == 'true'
-        run: echo "Cache HIT: Skipping npm install!"  
+        run: | 
+          echo "Cache HIT: Skipping npm install!"  
           
       # 5. Login to Docker Hub
       - name: Docker login
