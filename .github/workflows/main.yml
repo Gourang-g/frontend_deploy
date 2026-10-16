@@ -9,29 +9,25 @@ on:
   workflow_dispatch:
 
 jobs:
-  # JOB 1: Build assets and upload them as an artifact
-  build:
+  # ==========================================
+  # JOB 1: Test multi-OS compatibility WITHOUT Docker
+  # ==========================================
+  validate:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [20, 22, 24]
-    outputs:
-      artifact-name: frontend-build # Optional: pass name to next job
-
+        node-version: [20, 22]
     steps:
-      # 1. Download repository code
       - name: Checkout code
         uses: actions/checkout@v4
         
-      # 2. Set up Node.js environment
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
-      # 3. Cache npm dependencies using a custom key
       - name: Cache npm dependencies
         id: npm-cache
         uses: actions/cache@v4
@@ -41,39 +37,59 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-npm-
 
-      # 4. Check for cache hit or miss, and install      
       - name: Install dependencies
         if: steps.npm-cache.outputs.cache-hit != 'true'
-        run: |
-          echo "Cache MISS: Installing dependencies from scratch..."
-          npm ci
+        run: npm ci
 
-      - name: Print Cache Status
-        if: steps.npm-cache.outputs.cache-hit == 'true'
-        run: | 
-          echo "Cache HIT: Skipping npm install!"  
+      - name: Build Application (Matrix Validation Only)
+        run: npm run build
+
+  # ==========================================
+  # JOB 2: Run Docker operations strictly on Linux
+  # ==========================================
+  build:
+    runs-on: ubuntu-latest  # Hardcoded to Linux (fixes the missing macOS executable error)
+    needs: validate         # Ensures this only runs if validation passes
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Cache npm dependencies
+        id: npm-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        if: steps.npm-cache.outputs.cache-hit != 'true'
+        run: npm ci
           
-      # Build your production assets (e.g., outputs to a 'dist' or 'build' folder)
+      # Build official production assets
       - name: Build Application
         run: npm run build
         
-      # STRATEGY APPLIED: Upload the built static files
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: frontend-build
-          path: dist/ # Change to 'build/' if using Create React App
+          path: dist/
           retention-days: 5
-
           
-      # 5. Login to Docker Hub
+      # Docker Login (Will execute safely on ubuntu-latest)
       - name: Docker login
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 6. Build and push frontend image
+      # Build & Push production image
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
@@ -81,7 +97,9 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/frontend:latest
 
-
+  # ==========================================
+  # JOB 3: Pull and Run on EC2
+  # ==========================================
   deploy:
     runs-on: ubuntu-latest
     needs: build
@@ -90,9 +108,8 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-build
-          path: ./download-assests
+          path: ./download-assets
   
-      # 7. Connect to EC2 and deploy
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.2.2
         with:
