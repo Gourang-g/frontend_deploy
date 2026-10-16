@@ -1,8 +1,11 @@
 name: Frontend Deployment
 
 on:
-  release:
-    types: [published]  
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/App.jsx'  
   workflow_dispatch:
 
 jobs:
