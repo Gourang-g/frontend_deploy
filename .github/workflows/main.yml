@@ -1,31 +1,30 @@
 name: Frontend Deployment
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'src/App.jsx'  
+  release:
+    types: [published]  
   workflow_dispatch:
 
 jobs:
-  # JOB 1: Test multi-OS compatibility WITHOUT Docker
-  validate:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [20, 22]
+  # JOB 1: Build assets and upload them as an artifact
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-name: frontend-build # Optional: pass name to next job
+
     steps:
+      # 1. Download repository code
       - name: Checkout code
         uses: actions/checkout@v4
         
+      # 2. Set up Node.js environment
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 22
           cache: 'npm'
 
+      # 3. Cache npm dependencies using a custom key
       - name: Cache npm dependencies
         id: npm-cache
         uses: actions/cache@v4
@@ -35,62 +34,48 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-npm-
 
+      # 4. Check for cache hit or miss, and install      
       - name: Install dependencies
         if: steps.npm-cache.outputs.cache-hit != 'true'
-        run: npm ci
+        run: |
+          echo "Cache MISS: Installing dependencies from scratch..."
+          npm ci
 
-      - name: Build Application (Matrix Validation Only)
-        run: npm run build
-
-  build:
-    runs-on: ubuntu-latest  # Hardcoded to Linux (fixes the missing macOS executable error)
-    needs: validate         # Ensures this only runs if validation passes
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: 'npm'
-
-      - name: Cache npm dependencies
-        id: npm-cache
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-npm-${{ hashFiles('package-lock.json') }}
-
-      - name: Install dependencies
-        if: steps.npm-cache.outputs.cache-hit != 'true'
-        run: npm ci
+      - name: Print Cache Status
+        if: steps.npm-cache.outputs.cache-hit == 'true'
+        run: | 
+          echo "Cache HIT: Skipping npm install!"  
           
-      # Build official production assets
+      # Build your production assets (e.g., outputs to a 'dist' or 'build' folder)
       - name: Build Application
         run: npm run build
         
+      # STRATEGY APPLIED: Upload the built static files
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: frontend-build
-          path: dist/
+          path: dist/ # Change to 'build/' if using Create React App
           retention-days: 5
+
           
-      # Docker Login (Will execute safely on ubuntu-latest)
+      # 5. Login to Docker Hub
       - name: Docker login
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Build & Push production image
+      # 6. Build and push frontend image
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/frontend:latest
+          tags:
+            ${{ secrets.DOCKER_USERNAME }}/frontend:${{ github.event.release.tag_name }}
+            ${{ secrets.DOCKER_USERNAME }}/frontend:latest
+
 
   deploy:
     runs-on: ubuntu-latest
@@ -100,8 +85,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-build
-          path: ./download-assets
+          path: ./download-assests
   
+      # 7. Connect to EC2 and deploy
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.2.2
         with:
