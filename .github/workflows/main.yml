@@ -52,6 +52,15 @@ jobs:
       # Build your production assets (e.g., outputs to a 'dist' or 'build' folder)
       - name: Build Application
         run: npm run build
+
+      - name: Create GitHub Release
+        env:
+           GH_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          zip -r frontend-build.zip dist/
+          gh release create "v${{ github.run_number }}" frontend-build.zip \
+            --title "Release v${{ github.run_number }}" \
+            --notes "Automated production build asset from run #${{ github.run_number }}."
         
       # STRATEGY APPLIED: Upload the built static files
       - name: Upload Build Artifact
@@ -76,7 +85,6 @@ jobs:
           context: .
           push: true
           tags:
-            ${{ secrets.DOCKER_USERNAME }}/frontend:${{ github.event.release.tag_name }}
             ${{ secrets.DOCKER_USERNAME }}/frontend:latest
 
 
@@ -88,7 +96,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-build
-          path: ./download-assests
+          path: ./download-assets
   
       # 7. Connect to EC2 and deploy
       - name: Deploy to EC2
