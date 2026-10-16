@@ -9,9 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ==========================================
   # JOB 1: Test multi-OS compatibility WITHOUT Docker
-  # ==========================================
   validate:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -44,9 +42,6 @@ jobs:
       - name: Build Application (Matrix Validation Only)
         run: npm run build
 
-  # ==========================================
-  # JOB 2: Run Docker operations strictly on Linux
-  # ==========================================
   build:
     runs-on: ubuntu-latest  # Hardcoded to Linux (fixes the missing macOS executable error)
     needs: validate         # Ensures this only runs if validation passes
@@ -97,9 +92,6 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/frontend:latest
 
-  # ==========================================
-  # JOB 3: Pull and Run on EC2
-  # ==========================================
   deploy:
     runs-on: ubuntu-latest
     needs: build
