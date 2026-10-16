@@ -5,8 +5,11 @@ on:
     branches:
       - main
     paths:
-      - 'src/App.jsx'  
+      - 'src/App.jsx' 
+    tags: -'v*..'  
   workflow_dispatch:
+permissions: 
+    contents: write
 
 jobs:
   # JOB 1: Build assets and upload them as an artifact
@@ -53,14 +56,16 @@ jobs:
       - name: Build Application
         run: npm run build
 
+      - name: Create Git Tag
+        run: | 
+          git tag "v${{ github.run_number }}"
+          git push origin "v${{ github.run_number }}"
+
       - name: Create GitHub Release
-        env:
-           GH_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          zip -r frontend-build.zip dist/
-          gh release create "v${{ github.run_number }}" frontend-build.zip \
-            --title "Release v${{ github.run_number }}" \
-            --notes "Automated production build asset from run #${{ github.run_number }}."
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ github.run_number }}"
+          generate_release_notes: true
         
       # STRATEGY APPLIED: Upload the built static files
       - name: Upload Build Artifact
